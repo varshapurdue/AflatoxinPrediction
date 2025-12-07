@@ -3,10 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 
-model = joblib.load("aflatoxin_model.pkl")  # this should match the file you exported
+# Load trained model
+model = joblib.load("aflatoxin_model.pkl")
 
+# Initialize FastAPI app
 app = FastAPI()
 
+# Allow all CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Define request schema
 class InputData(BaseModel):
     temp_c: float
     relative_humidity_pct: float
@@ -22,6 +26,16 @@ class InputData(BaseModel):
     moisture_pct: float
     storage_day: int
 
+# Define risk level logic
+def risk_level(ppb):
+    if ppb < 5:
+        return "low"
+    elif ppb < 20:
+        return "medium"
+    else:
+        return "high"
+
+# Prediction endpoint
 @app.post("/predict")
 def predict(data: InputData):
     X = [[
@@ -31,16 +45,11 @@ def predict(data: InputData):
         data.co2_ppm,
         data.storage_day
     ]]
-    
-    ppb = model.predict(X)[0]
 
-    if ppb < 5:
-        risk = "low"
-    elif ppb < 20:
-        risk = "medium"
-    else:
-        risk = "high"
+    ppb = model.predict(X)[0]
+    risk = risk_level(ppb)
 
     return {
-        "predicted_ppb": round(ppb, 2),
+        "predicted_ppb": round(float(ppb), 2),
         "predicted_risk": risk
+    }
